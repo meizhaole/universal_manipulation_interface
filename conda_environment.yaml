@@ -23,7 +23,6 @@ dependencies:
   - zarr=2.16
   - numcodecs=0.11
   - hydra-core=1.2.0
-  - wandb=0.15.8
   - dill=0.3.7
   - einops=0.6.1
   - diffusers=0.18.2
@@ -41,6 +40,8 @@ dependencies:
   - aiohttp=3.9
   - aiofiles=23.2
   - pip:
+    # 0.15.8 只带 protobuf 3/4 的生成代码，与 robomimic 拉来的 tensorboard 所需的 protobuf 6 冲突
+    - wandb==0.19.11
     - ray[default]==2.8.0
     - threadpoolctl==3.2
     - v4l2py==2.2
