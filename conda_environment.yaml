@@ -40,8 +40,9 @@ dependencies:
   - aiohttp=3.9
   - aiofiles=23.2
   - pip:
-    # 0.15.8 只带 protobuf 3/4 的生成代码，与 robomimic 拉来的 tensorboard 所需的 protobuf 6 冲突
+    # wandb 0.15.8 只带 protobuf 3/4 的生成代码，锁住 tensorboard 以免它把 protobuf 顶到 7
     - wandb==0.19.11
+    - tensorboard==2.21.0
     - ray[default]==2.8.0
     - threadpoolctl==3.2
     - v4l2py==2.2
