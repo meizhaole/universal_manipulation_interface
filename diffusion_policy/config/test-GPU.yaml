@@ -1,0 +1,39 @@
+defaults:
+  - test
+  - _self_
+
+# 冒烟训练（GPU 版）：只通过 yaml 指定训练卡，无需改代码
+#
+# 原理：本仓库 TrainDiffusionUnetImageWorkspace 用 HuggingFace Accelerate 选设备，
+# 而 accelerate 在构造时会读取环境变量 ACCELERATE_TORCH_DEVICE。
+# Hydra 的 hydra.job.env_set 会在执行任务函数之前把该变量写进环境，
+# 所以只要在这里声明，训练就会落到指定卡上。
+name: test-GPU
+
+# 只改这一行即可换卡：cuda:0 / cuda:1 ...
+hydra:
+  job:
+    env_set:
+      ACCELERATE_TORCH_DEVICE: cuda:0
+
+# 让 training.device 跟随上面的环境变量，两处保持一致
+training:
+  device: ${oc.env:ACCELERATE_TORCH_DEVICE,cuda:0}
+
+# 8GB 显存，沿用 test.yaml 的小 batch
+dataloader:
+  batch_size: 4
+  num_workers: 4
+  pin_memory: True
+val_dataloader:
+  batch_size: 4
+  num_workers: 4
+  pin_memory: True
+
+logging:
+  mode: offline
+
+# 启动：
+#   CUDA_VISIBLE_DEVICES=0 python train.py --config-name=test-GPU
+# 验证：
+#   nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv -l 1
