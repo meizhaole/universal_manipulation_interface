@@ -1,3 +1,4 @@
+# 标定 WSG 夹爪的响应延迟
 # %%
 import sys
 import os

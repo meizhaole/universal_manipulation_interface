@@ -1,3 +1,4 @@
+# 回放 SLAM 输出的位姿轨迹
 # %%
 import sys
 import os

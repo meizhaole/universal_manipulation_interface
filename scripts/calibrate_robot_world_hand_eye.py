@@ -1,3 +1,4 @@
+# 标定机器人世界坐标系与相机的手眼变换
 """
 Example:
 python scripts/calibrate_robot_world_hand_eye.py -i data/calibration/hand_eye_calib.pkl -o data/calibration/robot_world_hand_eye.json --intr_json data/calibration/gopro_intrinsics_1080p.json --aruco_yaml data/calibration/aruco_config.yaml --tag_id 12

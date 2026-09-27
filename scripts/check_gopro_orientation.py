@@ -1,3 +1,4 @@
+# 检查 session 内 GoPro 视频的拍摄朝向
 # %%
 import sys
 import os

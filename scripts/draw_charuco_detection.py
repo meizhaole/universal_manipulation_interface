@@ -1,3 +1,4 @@
+# 可视化 ChArUco 标定板检测结果
 # %%
 import sys
 import os

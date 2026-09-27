@@ -1,3 +1,4 @@
+# 从 ArUco 标签检测标定夹爪开合范围
 # %%
 import sys
 import os

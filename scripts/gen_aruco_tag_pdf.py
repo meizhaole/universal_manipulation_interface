@@ -1,3 +1,4 @@
+# 生成 ArUco 标签的打印用 PDF
 # %%
 import sys
 import os

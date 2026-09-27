@@ -1,3 +1,4 @@
+# 批量检测视频中的 ArUco 标签
 # %%
 import sys
 import os

@@ -1,3 +1,4 @@
+# 生成夹爪与镜像区域的图像掩码
 # %%
 import sys
 import os

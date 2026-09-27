@@ -1,3 +1,4 @@
+# 为指定视频生成加速缩略图
 # %%
 import sys
 import os

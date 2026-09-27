@@ -1,3 +1,4 @@
+# 可视化 ArUco 标签检测结果
 # %%
 import sys
 import os

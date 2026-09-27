@@ -1,3 +1,4 @@
+# 用二维码标定 UVC 相机的采集延迟
 # %%
 import sys
 import os

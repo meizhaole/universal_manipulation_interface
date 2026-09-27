@@ -1,3 +1,4 @@
+# 检测回放轨迹中的异常旋转片段
 # %%
 import sys
 import os

@@ -1,3 +1,4 @@
+# 标定 SLAM 轨迹与 ArUco 标签间的变换
 # %%
 import sys
 import os

@@ -1,3 +1,4 @@
+# 采集手眼标定所需的机械臂与相机数据
 # %%
 import sys
 import os

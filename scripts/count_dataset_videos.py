@@ -1,3 +1,4 @@
+# 统计数据集中各 session 的视频与 episode 数量
 # %%
 import sys
 import os

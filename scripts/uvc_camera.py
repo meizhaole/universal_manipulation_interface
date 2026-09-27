@@ -1,3 +1,4 @@
+# UVC(Elgato 采集卡)相机接口封装
 import sys
 import os
 

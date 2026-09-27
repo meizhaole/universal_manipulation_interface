@@ -1,3 +1,4 @@
+# 为 session 目录下的演示视频批量生成加速缩略图
 # %%
 import sys
 import os

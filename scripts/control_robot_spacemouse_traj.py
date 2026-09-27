@@ -1,3 +1,4 @@
+# 用 SpaceMouse 示教并录制机械臂轨迹
 # %%
 import sys
 import os

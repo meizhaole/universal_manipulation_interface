@@ -1,3 +1,4 @@
+# 用二维码时间码对齐 GoPro 视频的时间偏移
 # %%
 import sys
 import os

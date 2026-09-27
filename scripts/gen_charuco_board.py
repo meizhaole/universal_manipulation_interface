@@ -1,3 +1,4 @@
+# 生成 ChArUco 标定板的打印用 PDF
 # %%
 import sys
 import os

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# 重置异常的 USB 设备
 import os
 import sys
 from subprocess import Popen, PIPE
