@@ -1,3 +1,4 @@
+# SLAM 流水线 7：把处理结果转换为 zarr replay buffer
 # %%
 import sys
 import os

@@ -1,3 +1,4 @@
+# SLAM 流水线 3：对 demos 目录批量运行 SLAM
 """
 python scripts_slam_pipeline/03_batch_slam.py -i data_workspace/fold_cloth_20231214/demos
 """

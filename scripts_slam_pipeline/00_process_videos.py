@@ -1,3 +1,4 @@
+# SLAM 流水线 0：预处理 session 内的原始 GoPro 视频
 """
 python scripts_slam_pipeline/00_process_videos.py data_workspace/toss_objects/20231113
 """

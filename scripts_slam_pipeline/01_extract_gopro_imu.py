@@ -1,3 +1,4 @@
+# SLAM 流水线 1：从 GoPro 视频中提取 IMU 数据
 """
 python scripts_slam_pipeline/01_extract_gopro_imu.py data_workspace/cup_in_the_wild/20240105_zhenjia_packard_2nd_conference_room
 """

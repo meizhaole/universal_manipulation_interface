@@ -1,3 +1,4 @@
+# SLAM 流水线 6：生成数据集计划（筛选可用片段并划分区间）
 """
 python scripts_slam_pipeline/06_generate_dataset_plan.py -i data_workspace/cup_in_the_wild/20240105_zhenjia_packard_2nd_conference_room
 """

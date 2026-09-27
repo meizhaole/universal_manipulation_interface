@@ -1,3 +1,4 @@
+# SLAM 流水线 2：用 mapping 视频构建 ORB-SLAM3 地图
 """
 python scripts_slam_pipeline/00_process_videos.py -i data_workspace/toss_objects/20231113/mapping
 """

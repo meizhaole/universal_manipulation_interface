@@ -1,3 +1,4 @@
+# SLAM 流水线 4：检测 demos 视频中的 ArUco 标签
 """
 python scripts_slam_pipeline/04_detect_aruco.py \
 -i data_workspace/cup_in_the_wild/20240105_zhenjia_packard_2nd_conference_room/demos \
