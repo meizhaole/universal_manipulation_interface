@@ -343,7 +343,11 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
                         del pred_action
                 
                 # checkpoint
-                if (self.epoch % cfg.training.checkpoint_every) == 0 and accelerator.is_main_process:
+                # 正常按 checkpoint_every 保存；另外在训练最后一个 epoch 强制保存一次，
+                # 否则当 num_epochs 不是 checkpoint_every 的整数倍时，最终模型不会落盘。
+                is_last_epoch = (self.epoch + 1) == cfg.training.num_epochs
+                if ((self.epoch % cfg.training.checkpoint_every) == 0 or is_last_epoch) \
+                        and accelerator.is_main_process:
                     # unwrap the model to save ckpt
                     model_ddp = self.model
                     self.model = accelerator.unwrap_model(self.model)
