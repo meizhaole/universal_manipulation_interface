@@ -36,6 +36,13 @@ class BaseWorkspace:
             exclude_keys=None,
             include_keys=None,
             use_thread=True):
+        # 若上一次保存线程还在跑，先等它结束并释放引用。
+        # 线程对象会通过闭包持有 payload（约数 GB 的 CPU 权重副本），
+        # 不释放会导致内存随每次保存累加，且 latest/topk 两次保存并发时峰值翻倍。
+        if self._saving_thread is not None:
+            self._saving_thread.join()
+            self._saving_thread = None
+
         if path is None:
             path = pathlib.Path(self.output_dir).joinpath('checkpoints', f'{tag}.ckpt')
         else:

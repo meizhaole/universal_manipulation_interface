@@ -139,6 +139,12 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
             steps_per_epoch = min(len(train_dataloader), cfg.training.max_train_steps)
         else:
             steps_per_epoch = len(train_dataloader)
+        # 续训时若 checkpoint 未存优化器状态（resume=False 时保存的 ckpt 不含 optimizer），
+        # 优化器的 param_groups 里没有 initial_lr，而 last_epoch!=−1 会要求它存在，
+        # 否则 LambdaLR 直接报 KeyError。用当前 lr 补上 initial_lr。
+        if cfg.training.resume:
+            for param_group in self.optimizer.param_groups:
+                param_group.setdefault('initial_lr', param_group['lr'])
         lr_scheduler = get_scheduler(
             cfg.training.lr_scheduler,
             optimizer=self.optimizer,
@@ -213,7 +219,11 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
         # training loop
         log_path = os.path.join(self.output_dir, 'logs.json.txt')
         with JsonLogger(log_path) as json_logger:
-            for local_epoch_idx in range(cfg.training.num_epochs):
+            # local_epoch_idx 只用于计数；真正的 epoch 号是 self.epoch。
+            # 续训时 self.epoch 已被 checkpoint 恢复到已完成轮数，若仍从 0 循环会多跑一轮，
+            # 因此从 self.epoch 起迭代到 cfg.training.num_epochs，保证总共只跑 num_epochs 轮。
+            # 从头训练时 self.epoch=0，行为与原来一致。
+            for local_epoch_idx in range(self.epoch, cfg.training.num_epochs):
                 self.model.train()
 
                 step_log = dict()
