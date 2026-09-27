@@ -17,6 +17,19 @@ def get_val_mask(n_episodes, val_ratio, seed=0):
     val_mask[val_idxs] = True
     return val_mask
 
+def downsample_mask(mask, max_n, seed=0):
+    # 训练集 episode 超过 max_n 时按种子随机下采样，其余置 False
+    if max_n is None or max_n <= 0:
+        return mask
+    n_true = int(np.sum(mask))
+    if n_true <= max_n:
+        return mask
+    rng = np.random.default_rng(seed=seed)
+    sampled = rng.choice(np.where(mask)[0], size=max_n, replace=False)
+    new_mask = np.zeros_like(mask)
+    new_mask[sampled] = True
+    return new_mask
+
 
 class SequenceSampler:
     def __init__(self,
