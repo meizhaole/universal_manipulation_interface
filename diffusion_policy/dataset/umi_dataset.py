@@ -19,7 +19,7 @@ from diffusion_policy.common.normalize_util import (
 from diffusion_policy.common.pose_repr_util import convert_pose_mat_rep
 from diffusion_policy.common.pytorch_util import dict_apply
 from diffusion_policy.common.replay_buffer import ReplayBuffer
-from diffusion_policy.common.sampler import SequenceSampler, get_val_mask
+from diffusion_policy.common.sampler import SequenceSampler, get_val_mask, downsample_mask
 from diffusion_policy.dataset.base_dataset import BaseDataset
 from diffusion_policy.model.common.normalizer import LinearNormalizer
 from umi.common.pose_util import pose_to_mat, mat_to_pose10d
@@ -37,6 +37,7 @@ class UmiDataset(BaseDataset):
         repeat_frame_prob: float=0.0,
         seed: int=42,
         val_ratio: float=0.0,
+        max_train_episodes: Optional[int]=None,
         max_duration: Optional[float]=None
     ):
         self.pose_repr = pose_repr
@@ -129,6 +130,12 @@ class UmiDataset(BaseDataset):
             seed=seed
         )
         train_mask = ~val_mask
+        # 只用训练集的子集：从 train_mask 中随机保留 max_train_episodes 个 episode
+        train_mask = downsample_mask(
+            mask=train_mask,
+            max_n=max_train_episodes,
+            seed=seed
+        )
 
         self.sampler_lowdim_keys = list()
         for key in lowdim_keys:

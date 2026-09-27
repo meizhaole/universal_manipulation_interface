@@ -1,0 +1,56 @@
+defaults:
+  - test-GPU
+  - _self_
+
+# 正式训练：在 test-GPU 基础上关闭 debug，改用官方 in-the-wild cup arrangement 数据集
+# 数据集已下载到 data/cup_in_the_wild.zarr.zip（data/ 已被 .gitignore 忽略）
+name: formal
+
+# 训练卡：改这一行即可换卡
+hydra:
+  job:
+    env_set:
+      ACCELERATE_TORCH_DEVICE: cuda:0
+
+training:
+  device: ${oc.env:ACCELERATE_TORCH_DEVICE,cuda:0}
+  debug: False
+  # 本机单卡 8GB、约 2 it/s，官方 120 epochs 跑不完。
+  # 改为 30 epochs × 每 epoch 最多 300 步（batch 4），约 9000 步。
+  num_epochs: 30
+  max_train_steps: 300
+
+# 官方数据集；用绝对路径，避免工作目录不在仓库根目录时找不到
+# 等价的相对路径：data/cup_in_the_wild.zarr.zip
+task:
+  dataset_path: /home/pan/桌面/umi/universal_manipulation_interface/data/cup_in_the_wild.zarr.zip
+  dataset:
+    # 数据集约 17.9GB（699432 帧 224x224x3），本机只有 14GB 内存，
+    # cache_dir=null 会把整个数据集装进 zarr.MemoryStore 直接 OOM。
+    # 指向磁盘目录后改用 LMDB 按需读取，首次运行会把 zip 解包成 LMDB 缓存。
+    cache_dir: /home/pan/桌面/umi/universal_manipulation_interface/data/cache
+    # 只用训练集子集：从 1447 个 episode 里随机留 50 个，降低单 epoch 成本。
+    # 需要更长训练时调大这个值即可。
+    max_train_episodes: 50
+
+policy:
+  obs_encoder:
+    # 冒烟时为免下载关了预训练权重，正式训练恢复
+    pretrained: True
+    model_name: 'vit_base_patch16_clip_224.openai'
+
+# 8GB 显存，官方 batch_size=64 放不下，先用 4；显存有余量再往上调
+dataloader:
+  batch_size: 4
+  num_workers: 4
+  pin_memory: True
+  persistent_workers: True
+val_dataloader:
+  batch_size: 4
+  num_workers: 4
+  pin_memory: True
+  persistent_workers: True
+
+# 正式训练可改为 online 上传 wandb 云端；未登录 wandb 时保持 offline 更稳
+logging:
+  mode: offline

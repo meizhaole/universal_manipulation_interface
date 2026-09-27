@@ -133,12 +133,18 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
             self.ema_model.set_normalizer(normalizer)
 
         # configure lr scheduler
+        # max_train_steps 是按 epoch 截断的步数，算 LR 总步数时要用截断后的每 epoch 步数，
+        # 否则 cosine 调度会按完整 dataloader 长度展开，截断后 LR 几乎不衰减。
+        if cfg.training.max_train_steps is not None:
+            steps_per_epoch = min(len(train_dataloader), cfg.training.max_train_steps)
+        else:
+            steps_per_epoch = len(train_dataloader)
         lr_scheduler = get_scheduler(
             cfg.training.lr_scheduler,
             optimizer=self.optimizer,
             num_warmup_steps=cfg.training.lr_warmup_steps,
             num_training_steps=(
-                len(train_dataloader) * cfg.training.num_epochs) \
+                steps_per_epoch * cfg.training.num_epochs) \
                     // cfg.training.gradient_accumulate_every,
             # pytorch assumes stepping LRScheduler every epoch
             # however huggingface diffusers steps it every batch
