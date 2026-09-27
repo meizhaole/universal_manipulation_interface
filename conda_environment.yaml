@@ -41,6 +41,8 @@ dependencies:
     - --extra-index-url https://download.pytorch.org/whl/cu128
     - torch==2.7.1+cu128
     - torchvision==0.22.1+cu128
+    # diffusers 0.18.2 依赖 cached_download，该方法在 huggingface_hub 0.26 被移除
+    - huggingface_hub==0.25.2
     # wandb 0.15.8 只带 protobuf 3/4 的生成代码，锁住 tensorboard 以免它把 protobuf 顶到 7
     - wandb==0.19.11
     - tensorboard==2.21.0
