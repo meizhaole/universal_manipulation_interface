@@ -1,0 +1,26 @@
+defaults:
+  - train_diffusion_unet_timm_umi_workspace
+  - _self_
+
+# 冒烟训练：继承 UMI 主训练配置，只跑 2 epochs × 每 epoch 3 steps，并关闭 wandb
+name: test
+
+training:
+  debug: True
+
+# 冒烟从头训练，避免下载 CLIP 预训练权重
+policy:
+  obs_encoder:
+    pretrained: False
+
+# 8GB 显存跑不动默认的 batch_size=64，冒烟降到 4
+# 显存碎片严重时另设 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+dataloader:
+  batch_size: 4
+  num_workers: 4
+val_dataloader:
+  batch_size: 4
+  num_workers: 4
+
+logging:
+  mode: offline
