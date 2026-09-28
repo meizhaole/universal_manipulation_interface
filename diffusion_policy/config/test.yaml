@@ -16,11 +16,11 @@ policy:
 # 8GB 显存跑不动默认的 batch_size=64，冒烟降到 4
 # 显存碎片严重时另设 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 dataloader:
-  batch_size: 4
-  num_workers: 4
+  batch_size: 1
+  num_workers: 1
 val_dataloader:
-  batch_size: 4
-  num_workers: 4
+  batch_size: 1
+  num_workers: 1
 
 logging:
   mode: offline

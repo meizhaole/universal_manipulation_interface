@@ -1,0 +1,12 @@
+ray[default]==2.8.0
+threadpoolctl==3.2
+v4l2py==2.2
+ur-rtde==1.5.6
+atomics==1.0.2
+pynput==1.7.6
+fastcrc==0.2
+imagecodecs==2023.9.18
+robomimic==0.2.0
+free-mujoco-py==2.1.6
+robosuite @ https://github.com/cheng-chi/robosuite/archive/3f2c3116f1c0a1916e94bfa28da4d055927d1ab3.tar.gz
+PyExifTool==0.5
