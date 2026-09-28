@@ -39,17 +39,20 @@ policy:
     pretrained: True
     model_name: 'vit_base_patch16_clip_224.openai'
 
-# 8GB 显存，官方 batch_size=64 放不下，先用 4；显存有余量再往上调
+# 8GB 显存，官方 batch_size=64 放不下，先用 4；显存有余量再往上调。
+# 本机只有 14GB 内存，worker 数必须压住：train 只留 1 个 worker，
+# val 用主进程读取（num_workers=0，因此 persistent_workers 必须为 False），
+# 否则 batch 4 + 持久 worker 会在 epoch 边界把内存顶爆并触发 OOM killer。
 dataloader:
   batch_size: 4
-  num_workers: 4
+  num_workers: 1
   pin_memory: True
   persistent_workers: True
 val_dataloader:
   batch_size: 4
-  num_workers: 4
+  num_workers: 0
   pin_memory: True
-  persistent_workers: True
+  persistent_workers: False
 
 # 正式训练可改为 online 上传 wandb 云端；未登录 wandb 时保持 offline 更稳
 logging:
