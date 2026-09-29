@@ -69,7 +69,7 @@ def load_policy(ckpt_path, device):
     return cfg, policy
 
 
-def build_heldout_dataset(cfg):
+def build_eval_dataset(cfg, split='heldout'):
     # 直接实例化训练用的 dataset，读到同一个 LMDB 缓存与 val_mask
     dataset = hydra.utils.instantiate(cfg.task.dataset)
     n_episodes = dataset.replay_buffer.n_episodes
@@ -88,10 +88,11 @@ def build_heldout_dataset(cfg):
         max_n=max_train_episodes,
         seed=seed
     )
-    heldout_mask = ~train_mask
+    # 默认评估留出集；split=train 用于对照，验证管线本身是否正确
+    eval_mask = train_mask if split == 'train' else ~train_mask
 
-    # 仿照 get_validation_dataset，用留出 episode 重建一个 sampler
-    heldout_sampler = SequenceSampler(
+    # 仿照 get_validation_dataset，用指定 episode 重建一个 sampler
+    eval_sampler = SequenceSampler(
         shape_meta=dataset.shape_meta,
         replay_buffer=dataset.replay_buffer,
         rgb_keys=dataset.rgb_keys,
@@ -99,21 +100,21 @@ def build_heldout_dataset(cfg):
         key_horizon=dataset.key_horizon,
         key_latency_steps=dataset.key_latency_steps,
         key_down_sample_steps=dataset.key_down_sample_steps,
-        episode_mask=heldout_mask,
+        episode_mask=eval_mask,
         action_padding=dataset.action_padding,
         repeat_frame_prob=dataset.repeat_frame_prob,
         max_duration=dataset.max_duration
     )
-    heldout_set = copy.copy(dataset)
-    heldout_set.sampler = heldout_sampler
-    heldout_set.val_mask = heldout_mask
-    return dataset, heldout_set, heldout_mask
+    eval_set = copy.copy(dataset)
+    eval_set.sampler = eval_sampler
+    eval_set.val_mask = eval_mask
+    return dataset, eval_set, eval_mask
 
 
-def pick_windows(heldout_set, dataset, num_episodes, windows_per_episode, seed):
-    # 把留出样本按 episode 分组，再按 episode 抽样，避免同一段视频被重复采样
+def pick_windows(eval_set, dataset, num_episodes, windows_per_episode, seed):
+    # 把样本按 episode 分组，再按 episode 抽样，避免同一段视频被重复采样
     episode_ends = dataset.replay_buffer.episode_ends[:]
-    cur_idx = np.array([item[0] for item in heldout_set.sampler.indices])
+    cur_idx = np.array([item[0] for item in eval_set.sampler.indices])
     ep_ids = np.searchsorted(episode_ends, cur_idx, side='right')
 
     ep_to_pos = collections.defaultdict(list)
@@ -217,6 +218,13 @@ def main():
     parser.add_argument('--latency_warmup', type=int, default=3)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--out_dir', type=str, default='data/eval_offline')
+    parser.add_argument(
+        '--split',
+        type=str,
+        default='heldout',
+        choices=['heldout', 'train'],
+        help='评估集：heldout 为未参与训练的 episode，train 用于对照验证管线'
+    )
     parser.add_argument('--smoke', action='store_true', help='冒烟模式：1 episode 1 窗口且不画图')
     parser.add_argument('--no_plots', action='store_true')
     args = parser.parse_args()
@@ -253,22 +261,22 @@ def main():
     log('加载', f'normalizer：{normalizer_path}，num_inference_steps={policy.num_inference_steps}', C.GREEN)
 
     # %%
-    log('数据', '实例化数据集并复现训练 mask')
-    dataset, heldout_set, heldout_mask = build_heldout_dataset(cfg)
+    log('数据', f'实例化数据集并复现训练 mask，split={args.split}')
+    dataset, eval_set, eval_mask = build_eval_dataset(cfg, split=args.split)
     n_episodes = dataset.replay_buffer.n_episodes
-    n_heldout = int(heldout_mask.sum())
+    n_eval = int(eval_mask.sum())
     log(
         '数据',
-        f'总 episode={n_episodes}，留出 episode={n_heldout}，'
-        f'留出窗口={len(heldout_set.sampler)}',
+        f'总 episode={n_episodes}，评估 episode={n_eval}，'
+        f'评估窗口={len(eval_set.sampler)}',
         C.GREEN
     )
-    if n_heldout == 0:
-        log('错误', '没有留出 episode，无法评估', C.RED)
+    if n_eval == 0:
+        log('错误', '评估 episode 数为 0，无法评估', C.RED)
         sys.exit(1)
 
     windows = pick_windows(
-        heldout_set,
+        eval_set,
         dataset,
         args.num_episodes,
         args.windows_per_episode,
@@ -279,7 +287,7 @@ def main():
     # %%
     log('预热', f'预热 {args.latency_warmup} 次')
     np.random.seed(args.seed)
-    first_sample = heldout_set[windows[0][1]]
+    first_sample = eval_set[windows[0][1]]
     for _ in range(args.latency_warmup):
         infer_one(policy, first_sample, device)
     log('预热', '完成', C.GREEN)
@@ -290,7 +298,7 @@ def main():
     latencies = list()
     for ep, pos in windows:
         np.random.seed(args.seed + pos)
-        sample = heldout_set[pos]
+        sample = eval_set[pos]
         t0 = time.perf_counter()
         pred = infer_one(policy, sample, device)
         if device.type == 'cuda':
