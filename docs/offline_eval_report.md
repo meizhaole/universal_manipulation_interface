@@ -1,6 +1,6 @@
 # UMI 杯具整理策略：训练与离线推理报告
 
-本报告记录 UMI（Universal Manipulation Interface）杯具整理策略在本机的训练过程，以及用留出示教数据做的离线推理评测。结论先说：离线推理管线跑通且经过训练集对照验证，管线本身没有问题；当前策略在训练数据上也有约 8cm 的开环位置误差，属于欠训练，不是评估方法的问题。
+本报告记录 UMI（Universal Manipulation Interface）杯具整理策略在本机的训练过程，以及用留出示教数据做的离线推理评测，并与官方预训练权重做了同口径对照。结论先说：离线推理管线正确，预处理与训练一致；本机模型与官方模型在同一批 72 个留出 episode 上的开环位置误差分别是 7.83cm 和 0.52cm，差距约 15 倍，本机模型属于欠训练。
 
 ## 1. 训练情况
 
@@ -90,9 +90,24 @@
 
 ```bash
 conda activate umi
-python scripts/eval_offline_policy.py --smoke                                  # 冒烟：1 episode 1 窗口
-python scripts/eval_offline_policy.py --num_episodes 20 --windows_per_episode 5 # 留出集全量
-python scripts/eval_offline_policy.py --split train --num_episodes 10 --windows_per_episode 2 # 训练集对照
+
+# 本机模型，冒烟：1 episode 1 窗口
+python scripts/eval_offline_policy.py --smoke
+
+# 本机模型，留出集全量
+python scripts/eval_offline_policy.py --num_episodes 20 --windows_per_episode 5
+
+# 本机模型，训练集对照
+python scripts/eval_offline_policy.py --split train --num_episodes 10 --windows_per_episode 2
+
+# 官方 ckpt，与 val 集同口径对比
+python scripts/eval_offline_policy.py \
+  --ckpt data/pretrained/cup_wild_vit_l_1img.ckpt \
+  --dataset_path data/cup_in_the_wild.zarr.zip \
+  --cache_dir data/cache \
+  --skip_pretrained \
+  --split val --num_episodes 20 --windows_per_episode 5 \
+  --out_dir data/eval_offline_official
 ```
 
 ### 2.3 结果指标
@@ -128,27 +143,62 @@ python scripts/eval_offline_policy.py --split train --num_episodes 10 --windows_
 
 留出集与训练集的位置、旋转误差分布高度重叠，训练集没有更集中。
 
+### 2.6 与官方预训练权重对照
+
+官方权重为 `cup_wild_vit_l_1img.ckpt`，约 3.05GB，与本机模型的差异如下。
+
+| 项 | 本机模型 | 官方模型 |
+| --- | --- | --- |
+| 视觉编码器 | ViT-B/16 CLIP | ViT-L/14 CLIP（已微调） |
+| 图像 horizon | 2 | 1 |
+| 训练 episode | 50 | 1375（全量减去验证） |
+| epoch | 30 | 120 |
+
+加载官方 ckpt 需要三处适配：覆盖数据集路径为本地文件、复用本地 LMDB 缓存、跳过 timm 预训练权重下载（ckpt 内已含微调权重），以及在没有外部 `normalizer.pkl` 时使用 ckpt 内置的 normalizer。脚本已支持这些选项。
+
+两个模型都在这批 72 个留出 episode 上评测，随机抽 20 个 episode，每个 5 个窗口，共 100 次推理。2.3 节本机模型的留出集是更大的 1397 个 episode，口径与本机训练匹配；这里改用两个模型共享的 72 个 val episode，才能公平对比。
+
+| 指标 | 本机模型 | 官方模型 |
+| --- | --- | --- |
+| 位置误差均值 | 7.83cm | 0.52cm |
+| 位置误差 p95 | 19.67cm | 1.49cm |
+| 旋转误差均值 | 10.31 度 | 0.64 度 |
+| 旋转误差 p95 | 27.99 度 | 2.52 度 |
+| 夹爪误差均值 | 0.0103 | 0.0004 |
+| 单次预测耗时均值 | 170ms | 217ms |
+
+![指标对比](assets/metrics_bar.png)
+
+![误差分布对比](assets/error_hist_val.png)
+
+官方模型预测对比（前 8 个窗口）：
+
+![官方模型预测对比](assets/pred_vs_gt_official.png)
+
+本机模型预测对比（同一批留出 episode）：
+
+![本机模型预测对比](assets/pred_vs_gt_local_val.png)
+
+官方模型的误差集中在亚厘米级，曲线平滑贴合真值；本机模型误差分布明显右移且拖尾，逐帧抖动明显。这确立了两个事实。第一，开环 16 步口径下亚厘米级是可达的，7.83cm 不是口径造成的，而是训练不足。第二，离线推理管线正确，如果预处理与训练存在错位，官方模型不可能给出 0.52cm 的误差。
+
 ## 3. 结论
 
-留出集与训练集误差几乎相同（位置 7.50cm 对 7.97cm，旋转 10.48 度对 10.92 度），训练集没有明显优势。这说明两点。
+离线推理管线已验证正确。留出集与训练集误差几乎相同（本机模型位置 7.50cm 对 7.97cm），说明预处理没有引入训练与评估的错位；官方预训练权重在完全相同的留出 episode 上给出 0.52cm 的位置误差和 0.64 度的旋转误差，进一步排除了口径问题。
 
-第一，离线推理管线正确。如果预处理与训练存在错位，留出集误差会显著高于训练集，实测没有出现这个现象。
-
-第二，当前策略欠训练。30 个 epoch、batch 4、只用了 1447 个 episode 中的 50 个，总训练量远低于官方配置（120 epoch、全量数据）。训练损失收敛到 0.032 在归一化动作空间里仍偏高，反映到开环动作预测上就是约 8cm 的位置误差和明显的逐帧抖动。留出集上没有额外的泛化鸿沟，因为模型连训练数据都还没拟合到足够精度。
+当前策略的主要问题是欠训练。本机只用了 1447 个 episode 中的 50 个，30 个 epoch、batch 4，总训练量远低于官方配置（1375 个 episode、120 epoch）。训练损失收敛到 0.032 在归一化动作空间里偏高，反映到开环动作预测上就是 7.83cm 的位置误差和 10.31 度的旋转误差，与官方模型差距约 15 倍。留出集没有额外泛化鸿沟，因为模型连训练数据都还没拟合到足够精度。
 
 ## 4. 局限与后续
 
 本报告的口径局限在"开环动作块比对"，没有覆盖真实闭环执行。以下方向可以继续。
 
-1. 用官方预训练权重 `cup_wild_vit_l_1img.ckpt` 跑同一脚本做对照。官方模型误差若显著更低，管线即得到端到端验证，也能量化当前策略与官方策略的差距。需要下载约 2.5GB，且 obs encoder 不同，需要适配。
+1. 扩大训练子集（例如从 50 个 episode 提到 200 到 300 个）并增加训练步数，再用同一脚本评估，观察误差是否向官方水平收敛。本机 8GB 显存与 14GB 内存下，官方规模（约 98 小时）不可行，需要折中。
 2. 把比较口径改为前 8 步，贴近部署时实际执行的步数。
-3. 增加训练数据（episode 数）与训练步数后重新训练，再看离线指标是否下降。
-4. 每次窗口多采样若干动作取平均，或降低 diffusion 采样随机性，减少逐帧抖动。
-5. 在仿真中对预测动作块做回放，验证坐标转换与可达性；完整视觉闭环仿真需要另建场景。
+3. 每次窗口多采样若干动作取平均，或降低 diffusion 采样随机性，减少逐帧抖动。
+4. 在仿真中对预测动作块做回放，验证坐标转换与可达性；完整视觉闭环仿真需要另建场景。
 
 ## 5. 复现环境清单
 
 - 代码：本仓库 `main` 分支
 - 评估脚本：`scripts/eval_offline_policy.py`
-- 评测输出：`data/eval_offline/`（留出集）、`data/eval_offline_train/`（训练集对照），均为 gitignore 目录
+- 评测输出：`data/eval_offline/`（本机模型留出集）、`data/eval_offline_train/`（本机模型训练集对照）、`data/eval_offline_local/`（本机模型 val 口径）、`data/eval_offline_official/`（官方模型 val 口径），均为 gitignore 目录
 - 图片素材：`docs/assets/`
