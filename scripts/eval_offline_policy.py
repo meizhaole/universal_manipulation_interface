@@ -43,14 +43,30 @@ def log(tag, msg, color=C.CYAN):
     print(f"{color}[{tag}]{C.END} {msg}", flush=True)
 
 
-def load_policy(ckpt_path, device):
-    # 用 checkpoint 里保存的 cfg 重建 workspace，保证 shape_meta 与训练完全一致
+def load_policy(
+    ckpt_path,
+    device,
+    dataset_path=None,
+    cache_dir=None,
+    skip_pretrained=False
+):
+    # mmap 节省内存：官方 ckpt 约 3GB，本机可用内存有限
     payload = torch.load(
-        open(ckpt_path, 'rb'),
+        ckpt_path,
         map_location='cpu',
-        pickle_module=dill
+        pickle_module=dill,
+        mmap=True
     )
     cfg = payload['cfg']
+    # 官方 ckpt 里记录的是作者机器上的数据集路径，允许用命令行覆盖
+    if dataset_path is not None:
+        cfg.task.dataset.dataset_path = dataset_path
+    if cache_dir is not None:
+        cfg.task.dataset.cache_dir = cache_dir
+    # 官方 ckpt 的 obs encoder 是 ViT-L，timm 预训练权重马上会被 ckpt 覆盖，跳过下载
+    if skip_pretrained:
+        cfg.policy.obs_encoder.pretrained = False
+
     cls = hydra.utils.get_class(cfg._target_)
     workspace = cls(cfg)
     workspace.load_payload(payload, exclude_keys=None, include_keys=None)
@@ -88,8 +104,13 @@ def build_eval_dataset(cfg, split='heldout'):
         max_n=max_train_episodes,
         seed=seed
     )
-    # 默认评估留出集；split=train 用于对照，验证管线本身是否正确
-    eval_mask = train_mask if split == 'train' else ~train_mask
+    # 默认评估留出集；split=val 用 dataset 自身的 val_mask，便于两个模型在同一批 episode 上对比；split=train 用于对照
+    if split == 'train':
+        eval_mask = train_mask
+    elif split == 'val':
+        eval_mask = val_mask
+    else:
+        eval_mask = ~train_mask
 
     # 仿照 get_validation_dataset，用指定 episode 重建一个 sampler
     eval_sampler = SequenceSampler(
@@ -219,11 +240,28 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--out_dir', type=str, default='data/eval_offline')
     parser.add_argument(
+        '--dataset_path',
+        type=str,
+        default=None,
+        help='覆盖 ckpt 里的数据集路径，评测官方 ckpt 时必填'
+    )
+    parser.add_argument(
+        '--cache_dir',
+        type=str,
+        default=None,
+        help='LMDB 缓存目录，指向已有缓存可避免重新解包大 zip'
+    )
+    parser.add_argument(
+        '--skip_pretrained',
+        action='store_true',
+        help='实例化时不加载 timm 预训练权重（ckpt 会覆盖，用于避免官方 ViT-L 下载）'
+    )
+    parser.add_argument(
         '--split',
         type=str,
         default='heldout',
-        choices=['heldout', 'train'],
-        help='评估集：heldout 为未参与训练的 episode，train 用于对照验证管线'
+        choices=['heldout', 'val', 'train'],
+        help='评估集：heldout 为未参与本机训练的 episode，val 为 dataset 的 val_mask（跨模型统一口径），train 用于对照验证管线'
     )
     parser.add_argument('--smoke', action='store_true', help='冒烟模式：1 episode 1 窗口且不画图')
     parser.add_argument('--no_plots', action='store_true')
@@ -249,16 +287,28 @@ def main():
     log('加载', f'checkpoint：{ckpt_path}')
     cfg = None
     policy = None
-    cfg, policy = load_policy(str(ckpt_path), device)
+    cfg, policy = load_policy(
+        str(ckpt_path),
+        device,
+        dataset_path=args.dataset_path,
+        cache_dir=args.cache_dir,
+        skip_pretrained=args.skip_pretrained
+    )
 
     normalizer_path = args.normalizer
     if normalizer_path is None:
         normalizer_path = ckpt_path.parent.parent.joinpath('normalizer.pkl')
-    normalizer = pickle.load(open(normalizer_path, 'rb'))
-    policy.set_normalizer(normalizer)
+    normalizer_path = pathlib.Path(normalizer_path)
+    if normalizer_path.is_file():
+        normalizer = pickle.load(open(normalizer_path, 'rb'))
+        policy.set_normalizer(normalizer)
+        log('加载', f'normalizer：{normalizer_path}', C.GREEN)
+    else:
+        # 官方 ckpt 的 normalizer 存在 state_dict 里，无需外部文件
+        log('加载', '未找到外部 normalizer.pkl，使用 ckpt 内置的 normalizer', C.YELLOW)
     policy.num_inference_steps = cfg.policy.num_inference_steps
     policy.eval().to(device)
-    log('加载', f'normalizer：{normalizer_path}，num_inference_steps={policy.num_inference_steps}', C.GREEN)
+    log('加载', f'num_inference_steps={policy.num_inference_steps}，prepared on {device}', C.GREEN)
 
     # %%
     log('数据', f'实例化数据集并复现训练 mask，split={args.split}')
